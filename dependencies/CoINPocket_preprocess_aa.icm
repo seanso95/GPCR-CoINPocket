@@ -1,0 +1,63 @@
+l_commands = no ; l_warn = no ; l_info = no
+
+print "RUNNING"
+if Length(Match(Path(directory), '/testing/')) > 0 then
+    root = '../'
+else
+    root = './'
+endif
+read table header "./temp/aminoacids.csv" separator=","
+
+read binary root+"/in/stacked.icb" name="T"
+cols = Name(T) != "T.stre" != "T.fp"
+group table master T.fp "fp" T.stre "stre" Sarray(Nof(T)) "pair"
+
+### appending to new table
+#start_time = Time()
+col_count = Nof(cols)
+read binary root+"/in/pairtable_empty.icb"
+for i_ = 1, col_count #fork 16 tmpT append  # forks pro-only, unsure impact in clustered computing
+    for j_ = i_, col_count
+        master.pair = $cols[i_] + $cols[j_]
+        join left master.pair aminoacids.res name="tmpscore"
+        add column tmpscore tmpscore.stre*tmpscore.sim name="simScore"
+        group tmpscore.fp tmpscore.simScore "sum,simScore"
+        tmpscore = Transpose(tmpscore, 1)
+        add column tmpscore Replace(Replace(cols[i_] + "@" + cols[j_], "T.", ""), "_orig", "") i_ j_ name={"pair", "i", "j"} index=1
+        add tmpT tmpscore
+    endfor
+endfor
+delete tmpscore T master
+
+cols = Name(tmpT) ~ "tmpT.*_*"
+col_count = Nof(cols)
+add column tmpT tmpT.i - tmpT.j name="same"
+for n = 1, col_count
+    mu = Mean($cols[n] [Index(tmpT.same < 0)])
+    sigma = Rmsd($cols[n] [Index(tmpT.same < 0)])
+    $cols[n] = ($cols[n] - mu)/sigma
+endfor
+
+read binary root+"/in/simTM.icb" name="tmp"  # TM similarities calculated on TM only, no ECL2
+add column tmp Replace(tmp.reci + "@" + tmp.recj, "_orig", "") name="pair"
+delete tmp.reci tmp.recj tmp.i tmp.j
+join left tmpT.pair tmp.pair name="tmpT"
+move tmpT.simTM 2
+delete tmp
+
+pocket_cols = Name(tmpT) ~ "*_*"
+add column tmpT ND name="simAvgP" index=3
+
+### generic pocket
+for n = 1, Nof(tmpT)
+    vals = Rarray()
+    for i = 1, Nof(pocket_cols)
+        vals = vals // $pocket_cols[i][n]
+    endfor
+    tmpT.simAvgP[n] = Mean(vals)
+endfor
+
+rename tmpT "T"
+write binary table "./temp/cp_optim.icb"
+
+quit

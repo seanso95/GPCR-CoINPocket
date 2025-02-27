@@ -1,0 +1,9 @@
+function HyperbolicScore r_ij r_ji r_max r_a r_b
+    r_ij = -Log(r_ij, 10)
+    r_ji = -Log(r_ji, 10)
+    centre = Log(r_max, 10)
+    eq1 = (((r_ji + centre)*Sin(45)) + ((r_ij + centre)*Cos(45)))/(centre - Log(r_a, 10))
+    eq2 = (((r_ji + centre)*Cos(45)) - ((r_ij + centre)*Sin(45)))/(r_b)
+    val = Power(eq1, 2) - Power(eq2, 2)
+    return val
+endfunction

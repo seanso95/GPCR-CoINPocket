@@ -1,0 +1,31 @@
+#!/bin/bash
+#SBATCH --job-name REPLACE_NAME
+#SBATCH --nodes 1
+#SBATCH --mem 16g
+#SBATCH --partition XXXX
+#SBATCH --qos XXXX
+#SBATCH --account XXXX
+#SBATCH --cpus-per-task 1
+#SBATCH --ntasks 1
+#SBATCH --time 8:00:00
+#SBATCH --output log/slurm-%j.out-%N
+#SBATCH --error log/slurm-%j.err-%N
+#SBATCH --mail-type ALL
+#SBATCH --mail-user XXXX
+#SBATCH --open-mode=append
+
+module purge
+module load cpu slurm
+
+TMPDIR=XXXX
+
+cd /XXXX/seanso/cpOptim/
+timeout 7.9h /XXXX/seanso/miniconda3/envs/ml2/bin/python3 optimiser_190.py -x REPLACE_NUM -f REPLACE_FOLD -t nelder-mead -d $TMPDIR -r True
+if [[ $? == 124 ]]; then
+  scontrol requeue $SLURM_JOB_ID
+fi
+
+sacct --format=Elapsed -j $SLURM_JOB_ID
+scontrol show job $SLURM_JOB_ID
+
+#End-of-file (EOF)

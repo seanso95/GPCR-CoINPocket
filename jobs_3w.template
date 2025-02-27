@@ -1,0 +1,16 @@
+#!/bin/bash
+#PBS -q XXXX
+#PBS -l nodes=1:ppn=2
+#PBS -l walltime=00:45:00
+#PBS -A XXXX
+#PBS -o XXXX
+#PBS -e XXXX
+#PBS -m abe
+#PBS -M XXXX
+#PBS -N REPLACE_NAME
+
+TMPDIR=/scratch/$USER/$PBS_JOBID 
+
+cd /home/seanso/cpOptim
+/home/seanso/miniconda3/envs/ml2/bin/python3 optimiser_3.py -n REPLACE_NONPOLAR -p REPLACE_POLAR -f REPLACE_FOLD -t REPLACE_METHOD -d $TMPDIR
+#End-of-file (EOF)

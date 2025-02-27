@@ -1,0 +1,76 @@
+l_commands = no
+l_info = no
+l_warn = yes
+call "_macro"
+
+# all './' locations are from original master script (e.g. location where the master python code was called)
+# calling the 'testing/' code will direct to 'testing/temp/' or 'testing/in/'
+
+# provide arguments - defaults supplied for automated code
+# can input desired values manually for testing
+upper = Tointeger(Getarg("-u", 5, delete))
+lower = Tointeger(Getarg("-l", 1,  delete))
+upperTM = Tointeger(Getarg("-utm", 35, delete))
+lowerTM = Tointeger(Getarg("-ltm", 20, delete))
+
+# set directory Path(last)  # not sure if necessary...?
+if Length(Match(Path(directory), '/testing/')) > 0 then
+    root = '../'
+else
+    root = './'
+endif
+
+read binary root+"/in/result.icb" name="tx"  #tx: acci accj swissi swissj nij nji fam fami famj
+
+
+# mark "true" and "false" chemical similarity for ROC
+call root+"/dependencies/funcHyperbola.icm"
+curvature = 1
+cent_val = Floor(Max(Max(tx.sij tx.sji)) + 0.5)  # find centre of hyperbola
+add column tx Rarray(Nof(tx)) Rarray(Nof(tx)) name={"hypp", "hypn"}
+for n = 1, Nof(tx)
+    tx.hypp[n] = HyperbolicScore(tx.sij[n], tx.sji[n], cent_val, upper, curvature)
+    tx.hypn[n] = HyperbolicScore(tx.sij[n], tx.sji[n], cent_val, lower, curvature)
+endfor
+add column tx Iarray(Nof(tx), -1) name="tr"
+tx.tr[Index(tx.hypn >= 2)] = 0
+tx.tr[Index(tx.hypp < 2)] = 1
+
+# merge tx with T
+read binary root+"/temp/cp_optim.icb" name="T"
+# add column T Replace(T.reci, "_orig", "") + "@" + Replace(T.recj, "_orig", "") name="pair"
+group table tt T.pair T.simAvgP T.simTM
+tmp = tt
+add column tmp Field(tmp.pair, 1, "@") Field(tmp.pair, 2, "@") name={"i", "j"}
+ixs = Iarray()
+for n = 1, Nof(tmp)
+    if tmp.i[n] == tmp.j[n] then
+        ixs = ixs // n
+    endif
+endfor
+delete tmp[ixs]
+tmp.pair = tmp.j + "@" + tmp.i
+add tt tmp
+delete T tmp
+add column tx tx.swissi + "@" + tx.swissj name="pair"
+join left tx.pair tt.pair name="tx"
+
+# ################
+# # REMOVE BLOCK IF YOU WANT TO IGNORE UNWEIGHTED GPCRDB ALIGNED POCKET
+# ################
+# ### also remove a bunch of opsin receptors, no entries in IUPHAR
+delete tx.pair ~ "*GNRR2_HUMAN*"
+delete tx.pair ~ "*RGR_HUMAN*"
+delete tx.pair ~ "*OPSX_HUMAN*"
+delete tx.pair ~ "*OPSG2_HUMAN*"
+delete tx.pair ~ "*OPSG3_HUMAN*"
+# ################
+
+# make ROCs
+group table froc tx.pair tx.simAvgP tx.tr tx.simTM
+delete froc.tr == -1
+twi = froc.simTM >= lowerTM & froc.simTM <= upperTM
+calc3Rocs -(twi.simAvgP) twi.tr "navy" yes
+print "cp_td", R_out[3]
+
+quit
